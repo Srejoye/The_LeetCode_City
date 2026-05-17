@@ -18,21 +18,6 @@ const headers = {
     "User-Agent": "Node-Script"
 };
 
-async function createLabel(name, color, description) {
-    const res = await fetch(`https://api.github.com/repos/${repo}/labels`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ name, color, description })
-    });
-    if (res.status === 201) {
-        console.log(`Created label: ${name}`);
-    } else if (res.status === 422) {
-        console.log(`Label ${name} already exists.`);
-    } else {
-        console.error(`Failed to create label ${name}:`, await res.text());
-    }
-}
-
 async function createIssue(title, body, labels) {
     const res = await fetch(`https://api.github.com/repos/${repo}/issues`, {
         method: 'POST',
@@ -48,34 +33,20 @@ async function createIssue(title, body, labels) {
 }
 
 async function run() {
-    await createLabel("good first issue", "7057ff", "Good for newcomers");
-    await createLabel("beginner", "0e8a16", "Beginner friendly task");
-    await createLabel("intermediate", "fbca04", "Intermediate level task");
-
     const issues = [
         {
-            title: "Add Screenshots to README",
-            body: "The `README.md` has a TODO to add screenshots. We need some nice screenshots of the 3D city, profile page, and compare mode.\n\nThis is a great issue for anyone looking to make their first contribution!",
+            title: "Clean up remaining mentions of previous owner",
+            body: "There are still some mentions of the original repository owner (`Samuel Rizzon` / `samuelrizzondev`) left over in the project. \n\nPlaces to look:\n- `user_ideas.txt`\n- `supabase/migrations/0091_sky_ads.sql`\n- `src/app/api/sky-ads/analytics/route.ts`\n- `src/app/advertise/track/[token]/page.tsx`\n\nThese need to be replaced with the current maintainer details or removed. This is a great, easy issue for getting started!",
             labels: ["good first issue", "beginner"]
         },
         {
-            title: "Translate Portuguese strings to English in Share Card API",
-            body: "There are some hardcoded Portuguese strings like `TODO ARRANHA-CEU COMEÇA EM ALGUM LUGAR` in `src/app/api/share-card/[username]/route.tsx` that need to be translated to English for internationalization.\n\nThis is a great issue for beginners looking to contribute to the codebase.",
+            title: "Rename leftover 'Git City' text to 'LeetCode City'",
+            body: "Since this project is 'LeetCode City', we need to remove the old 'Git City' mentions. Several SQL migrations inside `supabase/migrations/` and scripts like `scripts/analytics-report.mjs`, `scripts/seed.ts` still use 'Git City'. \n\nFor example, achievement descriptions in `010_raise_achievement_thresholds.sql` still say 'Refer 3 developers to Git City'. We need a sweep to fix these strings.",
             labels: ["good first issue", "beginner"]
         },
         {
-            title: "Implement actual Push Notifications",
-            body: "There is a TODO in `src/lib/notifications.ts` to replace placeholder push notification code with actual FCM/APNs/Web Push integration.\n\nThis requires some backend and frontend knowledge.",
-            labels: ["good first issue", "intermediate"]
-        },
-        {
-            title: "Create a new Weather Effect in CityScene",
-            body: "We want to add a new weather effect (like snow or rain) to the 3D scene in `src/components/CityScene.tsx` to make the city feel more alive. You can use React Three Fiber to implement this.\n\nGreat issue for those looking to learn or practice 3D graphics in the browser.",
-            labels: ["good first issue", "intermediate"]
-        },
-        {
-            title: "Add Unit Tests for utility functions",
-            body: "We need Jest or Vitest unit tests for the helper functions located in the `src/lib/` directory to improve code reliability. Pick one or more utility functions and add comprehensive test coverage.\n\nExcellent issue to practice writing unit tests.",
+            title: "[Feature] Implement Sky Ads Management Dashboard",
+            body: "We currently have some API endpoints for `sky-ads`, but we need a complete user interface under `/advertise` for users to submit, manage, and track their sky banner ads. \n\nRequirements:\n- A form to submit ad text, colors, and links.\n- Integration with our payment webhooks.\n- A dashboard page showing clicks and impressions analytics for the active user.",
             labels: ["good first issue", "intermediate"]
         }
     ];

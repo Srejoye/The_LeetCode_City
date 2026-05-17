@@ -56,7 +56,7 @@ Run `npm run lint` before submitting.
 ## Making Changes
 
 1. Fork the repo
-2. Create a branch from `main` (`git checkout -b feat/my-feature`)
+2. Create a branch from `main` and name it after the issue you are working on (e.g. `git checkout -b issue-name` or `git checkout -b 12-issue-name`)
 3. Make your changes
 4. Run `npm run lint` and fix any issues
 5. Commit with a clear message (e.g. `feat: add rain weather effect`)
