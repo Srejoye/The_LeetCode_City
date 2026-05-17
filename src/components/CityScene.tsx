@@ -107,13 +107,14 @@ function RainWeather() {
     const pts = pointsRef.current;
     if (!pts) return;
     const arr = (pts.geometry.attributes.position.array as Float32Array);
+    const tick = Math.floor(state.clock.elapsedTime * 60);
     for (let i = 0; i < WEATHER_PARTICLE_COUNT; i++) {
       const base = i * 3;
       arr[base + 1] -= speeds[i] * delta;
       if (arr[base + 1] < WEATHER_BOTTOM) {
-        arr[base] = (pseudoRandom(i * 17 + state.clock.elapsedTime) - 0.5) * WEATHER_AREA;
+        arr[base] = (pseudoRandom(i * 17 + tick) - 0.5) * WEATHER_AREA;
         arr[base + 1] = WEATHER_TOP;
-        arr[base + 2] = (pseudoRandom(i * 19 + state.clock.elapsedTime * 1.7) - 0.5) * WEATHER_AREA;
+        arr[base + 2] = (pseudoRandom(i * 19 + tick * 2) - 0.5) * WEATHER_AREA;
       }
     }
     pts.geometry.attributes.position.needsUpdate = true;
