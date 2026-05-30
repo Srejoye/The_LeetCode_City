@@ -306,7 +306,6 @@ export async function POST(request: Request) {
     appStreak: attacker.app_streak ?? 0,
     weeklyKudosGiven: attacker.current_week_kudos_given ?? 0,
     boostBonus,
-    stealthCloakActive: isStealthCloak,
     empShieldActive: isEmpShield,
   });
 
