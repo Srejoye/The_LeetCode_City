@@ -128,7 +128,6 @@ export async function POST(request: Request) {
     weeklyContributions: attacker.current_week_contributions ?? 0,
     appStreak: attacker.app_streak ?? 0,
     weeklyKudosGiven: attacker.current_week_kudos_given ?? 0,
-    stealthCloakActive: isStealthCloak,
     empShieldActive: isEmpShield,
   });
 
