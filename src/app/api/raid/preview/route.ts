@@ -118,10 +118,10 @@ export async function POST(request: Request) {
   const defenderScoutedDefense = hasSatellite 
     ? (activeDefenses.length > 0 ? activeDefenses.join(", ") : null)
     : (activeDefenses.length > 0 ? activeDefenses[0] : null);
-  const isStealthCloak = defenderScoutedDefense === "stealth_cloak";
-  const isEmpShield = defenderScoutedDefense === "emp_shield";
-  const isAntiMissile = defenderScoutedDefense === "anti_missile_system";
-  const isAntiTank = defenderScoutedDefense === "anti_tank_mines";
+  const isStealthCloak = defenderScoutedDefense?.includes("stealth_cloak") ?? false;
+  const isEmpShield = defenderScoutedDefense?.includes("emp_shield") ?? false;
+  const isAntiMissile = defenderScoutedDefense?.includes("anti_missile_system") ?? false;
+  const isAntiTank = defenderScoutedDefense?.includes("anti_tank_mines") ?? false;
 
   // Calculate scores
   const attack = calculateAttackScore({
