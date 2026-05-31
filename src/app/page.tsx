@@ -55,6 +55,7 @@ import {
 } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
 import MiniMap from "@/components/MiniMap";
+import CityAnalyticsDashboard from "@/components/CityAnalyticsDashboard";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import {
   DEFAULT_SKY_ADS,
@@ -657,6 +658,7 @@ function HomeContent() {
   const [claimingGift, setClaimingGift] = useState(false);
   const [feedEvents, setFeedEvents] = useState<FeedEvent[]>([]);
   const [feedPanelOpen, setFeedPanelOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [kudosSending, setKudosSending] = useState(false);
   const [kudosSent, setKudosSent] = useState(false);
   const [kudosError, setKudosError] = useState<string | null>(null);
@@ -3191,6 +3193,23 @@ function HomeContent() {
         visible={flyMode}
         currentDistrict={lastDistrictRef.current}
       />
+
+      {/* ─── Analytics Dashboard ─── */}
+      <CityAnalyticsDashboard
+        buildings={buildings}
+        liveUsers={liveUsers}
+        liveByLogin={liveByLogin}
+        districtZones={districtZones}
+        open={analyticsOpen}
+        onClose={() => setAnalyticsOpen(false)}
+      />
+      <button
+        onClick={() => setAnalyticsOpen((v) => !v)}
+        className="fixed top-3 right-14 z-40 border border-border bg-bg/90 px-2 py-1 text-[9px] hover:border-border-light transition-colors"
+        style={{ color: analyticsOpen ? "#ffa116" : "#8c8c9c" }}
+      >
+        [ANALYTICS]
+      </button>
 
       {/* ─── Explore Mode: minimal UI ─── */}
       {exploreMode && !flyMode && (
