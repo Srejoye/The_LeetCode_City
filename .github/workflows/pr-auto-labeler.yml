@@ -297,7 +297,7 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   pull_number: prNumber,
-                  body: '✅ **Security Scan: Clean**\n\nNo suspicious patterns detected.\n\n⭐ **If you enjoyed contributing, please consider starring the repository!**',
+                  body: '✅ **Security Scan: Clean**\n\nNo suspicious patterns detected. The official Copilot bot will provide detailed AI feedback shortly.\n\n⭐ **If you enjoyed contributing, please consider starring the repository!**',
                   event: 'COMMENT'
                 });
               }
