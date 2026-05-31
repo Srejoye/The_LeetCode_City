@@ -34,7 +34,7 @@
     },
     {
       "path": "/api/cron/lc-refresh",
-      "schedule": "0 6 * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
