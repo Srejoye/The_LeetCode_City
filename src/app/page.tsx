@@ -2095,6 +2095,13 @@ function HomeContent() {
     }
   }, [giftedParam, userParam, buildings, reloadCity]);
 
+  // Reload city immediately when loadout is saved from the shop
+  useEffect(() => {
+    const handler = () => reloadCity(true);
+    window.addEventListener("leetcodecity:loadout-saved", handler);
+    return () => window.removeEventListener("leetcodecity:loadout-saved", handler);
+  }, [reloadCity]);
+
   const searchUser = useCallback(async () => {
     const trimmed = username.trim().toLowerCase();
     if (!trimmed) return;
