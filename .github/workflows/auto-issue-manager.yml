@@ -32,12 +32,69 @@ jobs:
             // Handle triage approval (label removed)
             if (context.eventName === 'issues' && context.payload.action === 'unlabeled') {
               if (context.payload.label.name === 'needs-triage') {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  body: `✅ **Admin Approved!**\n\nThis issue has been reviewed and approved by the project maintainers. It is now open for contribution! 🎉\n\nTo claim this issue, simply comment \`assign me\` along with your \`### Proposed Solution\`.`
-                });
+                const authorLogin = issue.user.login;
+                let isCreatorAssigned = false;
+
+                // ── Creator Auto-Assign Logic ──
+                // If it's a real user (not bot, not Ixotic27), try to assign them their own issue
+                if (issue.user.type !== 'Bot' && authorLogin !== 'Ixotic27') {
+                  const { data: userAssignedIssues } = await github.rest.issues.listForRepo({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    assignee: authorLogin,
+                    state: 'open',
+                    per_page: 100,
+                  });
+                  const openAssignedIssues = userAssignedIssues.filter(i => !i.pull_request && i.number !== issue.number);
+                  
+                  if (openAssignedIssues.length < 3) {
+                    // Assign the author
+                    await github.rest.issues.addAssignees({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      assignees: [authorLogin]
+                    });
+                    
+                    isCreatorAssigned = true;
+                    
+                    const isCritical = issue.labels.some(l => l.name === 'level:critical');
+                    const deadlineText = isCritical ? '4 days (96 hours)' : '48 hours';
+
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: `✅ **Admin Approved!**\n\nHi @${authorLogin}, this issue has been reviewed and approved by the project maintainers. Since you raised this issue, you have been automatically assigned to it! 🚀\n\n⏰ **Deadline: You have ${deadlineText} from this exact moment to submit a Pull Request.**\n\n**📝 Important - PR Submission Rules:**\n1. **Branch Name:** Please name your branch starting with the issue number (e.g., \`${issue.number}-feature-name\`).\n2. **PR Description:** Make sure your Pull Request description includes \`Fixes #${issue.number}\`.\n\n🔒 *This conversation will now be locked. Please use your Pull Request for any further discussion about this issue.*`
+                    });
+
+                    // Lock the issue
+                    await github.rest.issues.lock({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      lock_reason: 'resolved'
+                    });
+                  } else {
+                    // Over limit
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: `✅ **Admin Approved!**\n\nHi @${authorLogin}, this issue has been reviewed and approved! We would normally auto-assign it to you, but you already have **${openAssignedIssues.length}/3** active assignments.\n\nThis issue is now open for contribution! 🎉 To claim this issue, simply comment \`assign me\` along with your \`### Proposed Solution\`.`
+                    });
+                  }
+                }
+                
+                if (!isCreatorAssigned && (issue.user.type === 'Bot' || authorLogin === 'Ixotic27')) {
+                   // Normal approval message for bots and maintainer
+                   await github.rest.issues.createComment({
+                     owner: context.repo.owner,
+                     repo: context.repo.repo,
+                     issue_number: issue.number,
+                     body: `✅ **Admin Approved!**\n\nHi @${authorLogin}, this issue has been reviewed and approved by the project maintainers. It is now open for contribution! 🎉\n\nTo claim this issue, simply comment \`assign me\` along with your \`### Proposed Solution\`.`
+                   });
+                }
 
                 // Auto-detect type and difficulty from issue content
                 const issueTitle = issue.title || '';
@@ -149,13 +206,13 @@ jobs:
 
             if (!wantsAssignment) return;
 
-            // Prevent assignment if the issue is still under triage
-            if (labels.includes('needs-triage')) {
+            // Prevent assignment if the issue is still under triage or not approved yet
+            if (labels.includes('needs-triage') || !labels.includes('gssoc:approved')) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                body: `Hi @${commenter}, thank you for your interest! 🙌\n\nHowever, this issue is currently marked as \`needs-triage\`, meaning it is still being reviewed by the project admin. Please wait until the issue is approved before requesting to be assigned.`
+                body: `Hi @${commenter}, thank you for your interest! 🙌\n\nHowever, this issue has not been approved for contribution yet. It must be reviewed by the maintainer and given the \`gssoc:approved\` label before you can be assigned. Please wait for approval!`
               });
               return;
             }
@@ -212,12 +269,15 @@ jobs:
                 assignees: [commenter]
               });
 
-              // Welcome message with 48-hour deadline and PR rules
+              const isCritical = labels.includes('level:critical');
+              const deadlineText = isCritical ? '4 days (96 hours)' : '48 hours';
+
+              // Welcome message with deadline and PR rules
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: `Hello @${commenter}, you have been selected to work on this issue! 🚀 Please read the \`CONTRIBUTING.md\` file before starting.\n\n⏰ **Deadline: You have 48 hours to submit a Pull Request for this issue.** If no PR is submitted within that time, the issue will be unassigned and made available for other contributors. This keeps the project moving and ensures everyone gets a fair opportunity!\n\n**📝 Important - PR Submission Rules:**\n1. **Branch Name:** Please name your branch starting with the issue number (e.g., \`${context.issue.number}-feature-name\`).\n2. **PR Description:** Make sure your Pull Request description includes \`Fixes #${context.issue.number}\` so it automatically links to this issue and inherits its labels.\n\n⭐ **If you're excited to contribute, please consider starring this repository to help increase its visibility and support the developer!**\n\n🔒 *This conversation will now be locked. Please use your Pull Request for any further discussion about this issue.*`
+                body: `Hello @${commenter}, you have been selected to work on this issue! 🚀 Please read the \`CONTRIBUTING.md\` file before starting.\n\n⏰ **Deadline: You have ${deadlineText} from this exact moment to submit a Pull Request for this issue.** If no PR is submitted within that time, the issue will be unassigned and made available for other contributors. This keeps the project moving and ensures everyone gets a fair opportunity!\n\n**📝 Important - PR Submission Rules:**\n1. **Branch Name:** Please name your branch starting with the issue number (e.g., \`${context.issue.number}-feature-name\`).\n2. **PR Description:** Make sure your Pull Request description includes \`Fixes #${context.issue.number}\` so it automatically links to this issue and inherits its labels.\n\n⭐ **If you're excited to contribute, please consider starring this repository to help increase its visibility and support the developer!**\n\n🔒 *This conversation will now be locked. Please use your Pull Request for any further discussion about this issue.*`
               });
 
               // Automatically add GSSoC labels if not present
