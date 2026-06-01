@@ -8,6 +8,7 @@ import InstancedBuildings from "./InstancedBuildings";
 import InstancedLabels from "./InstancedLabels";
 import EffectsLayer from "./EffectsLayer";
 import LiveDots from "./LiveDots";
+import FogMistWeather from "./FogMistWeather";
 import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
@@ -114,6 +115,9 @@ interface CitySceneProps {
   holdRise?: boolean;
   liveByLogin?: Map<string, LiveSession>;
   cityEnergy?: number;
+  weatherState?: "clear" | "rain" | "fog";
+  foggyIntensity?: number;
+  fogColor?: string;
 }
 
 function RainWeather() {
@@ -190,6 +194,9 @@ export default function CityScene({
   holdRise,
   liveByLogin,
   cityEnergy,
+  weatherState = "clear",
+  foggyIntensity = 0.0,
+  fogColor = "#0a1428",
 }: CitySceneProps) {
   const atlasTexture = useMemo(() => createWindowAtlas(colors), [colors]);
   const grid = useMemo(
@@ -259,6 +266,7 @@ export default function CityScene({
         holdRise={holdRise}
         liveByLogin={liveByLogin}
         cityEnergy={cityEnergy}
+        foggyIntensity={foggyIntensity}
       />
 
 
@@ -286,9 +294,16 @@ export default function CityScene({
         introMode={introMode}
         flyMode={flyMode}
         ghostPreviewLogin={ghostPreviewLogin}
+        foggyIntensity={foggyIntensity}
       />
 
-      {!introMode && <RainWeather />}
+      {!introMode && weatherState === "rain" && <RainWeather />}
+      {!introMode && weatherState === "fog" && (
+        <FogMistWeather
+          intensity={foggyIntensity}
+          color={fogColor}
+        />
+      )}
 
       {!introMode && focusedBuildingData && (
         <group

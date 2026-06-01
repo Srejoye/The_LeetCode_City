@@ -66,6 +66,7 @@ const fragmentShader = /* glsl */ `
   uniform float uDimEmissive;
   uniform float uCityEnergy;
   uniform float uTimeOfDay; // 0.0 = Night, 1.0 = Day
+  uniform float uFoggyIntensity; // 0.0 = Clear, 1.0 = Max Fog
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -117,7 +118,9 @@ const fragmentShader = /* glsl */ `
 
     // Windows glow more at night
     float nightGlowMultiplier = mix(3.5, 0.5, uTimeOfDay);
-    vec3 emissive = wallColor * nightGlowMultiplier * energyCube * isWindow;
+    // Boost window emissive light intensity under foggy conditions
+    float fogGlowMultiplier = mix(1.0, 2.5, uFoggyIntensity);
+    vec3 emissive = wallColor * nightGlowMultiplier * energyCube * isWindow * fogGlowMultiplier;
 
     vec3 wallFinal = wallColor * ambientBase + emissive;
     vec3 liveBoost = vec3(1.4, 1.35, 1.2);
@@ -183,6 +186,7 @@ interface InstancedBuildingsProps {
   holdRise?: boolean;
   liveByLogin?: Map<string, unknown>;
   cityEnergy?: number;
+  foggyIntensity?: number;
 }
 
 interface RiseState {
@@ -207,6 +211,7 @@ export default memo(function InstancedBuildings({
   holdRise,
   liveByLogin,
   cityEnergy = 1.0,
+  foggyIntensity = 0.0,
 }: InstancedBuildingsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = buildings.length;
@@ -220,26 +225,27 @@ export default memo(function InstancedBuildings({
   }, [buildings]);
 
   const geo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
-  const material = useMemo(() => {
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        uAtlas: { value: atlasTexture },
-        uRoofColor: { value: new THREE.Color(colors.roof) },
-        uFaceColor: { value: new THREE.Color(colors.face) },
-        uFogColor: { value: new THREE.Color("#0a1428") },
-        uFogNear: { value: 500 },
-        uFogFar: { value: 3500 },
-        uFocusedId: { value: -1.0 },
-        uFocusedIdB: { value: -1.0 },
-        uDimOpacity: { value: dimOpacity },
-        uDimEmissive: { value: dimEmissive },
-        uCityEnergy: { value: cityEnergy },
-        uTimeOfDay: { value: 1.0 },
-      },
-      vertexShader,
-      fragmentShader,
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uAtlas: { value: atlasTexture },
+      uRoofColor: { value: new THREE.Color(colors.roof) },
+      uFaceColor: { value: new THREE.Color(colors.face) },
+      uFogColor: { value: new THREE.Color("#0a1428") },
+      uFogNear: { value: 500 },
+      uFogFar: { value: 3500 },
+      uFocusedId: { value: -1.0 },
+      uFocusedIdB: { value: -1.0 },
+      uDimOpacity: { value: dimOpacity },
+      uDimEmissive: { value: dimEmissive },
+      uCityEnergy: { value: cityEnergy },
+      uTimeOfDay: { value: 1.0 },
+      uFoggyIntensity: { value: 0.0 },
+    },
+    vertexShader,
+    fragmentShader,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
 
   // Update uniforms in-place when theme/atlas changes so the instancedMesh
   // is NOT recreated (which would lose all instance attributes).
@@ -250,8 +256,9 @@ export default memo(function InstancedBuildings({
     material.uniforms.uDimOpacity.value = dimOpacity;
     material.uniforms.uDimEmissive.value = dimEmissive;
     material.uniforms.uCityEnergy.value = cityEnergy;
+    material.uniforms.uFoggyIntensity.value = foggyIntensity;
     material.needsUpdate = true;
-  }, [atlasTexture, colors.roof, colors.face, dimOpacity, dimEmissive, cityEnergy, material]);
+  }, [atlasTexture, colors.roof, colors.face, dimOpacity, dimEmissive, cityEnergy, foggyIntensity, material]);
 
   const { uvFrontData, uvSideData, riseData, tintData, lcData } =
     useMemo(() => {
@@ -319,10 +326,16 @@ export default memo(function InstancedBuildings({
     }, [buildings, count]);
 
   const liveData = useMemo(() => new Float32Array(count), [count]);
+  
+  // Use useRef for riseData mutation to prevent react-hooks/immutability errors
+  const riseDataRef = useRef<Float32Array>(riseData);
+  useEffect(() => {
+    riseDataRef.current = riseData;
+  }, [riseData]);
+
   const risingRef = useRef<RiseState[]>([]);
   const riseInitialized = useRef(false);
   const holdRiseRef = useRef(holdRise);
-  holdRiseRef.current = holdRise;
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -373,8 +386,13 @@ export default memo(function InstancedBuildings({
     );
 
     if (hasPlayedRiseGlobal) {
-      for (let i = 0; i < count; i++) riseData[i] = 1;
-      riseAttr.needsUpdate = true;
+      if (riseAttr) {
+        const arr = riseAttr.array as Float32Array;
+        for (let i = 0; i < arr.length; i++) {
+          arr[i] = 1;
+        }
+        riseAttr.needsUpdate = true;
+      }
       riseInitialized.current = true;
       risingRef.current = [];
     } else {
@@ -421,7 +439,6 @@ export default memo(function InstancedBuildings({
   const lastFogNear = useRef(0);
   const lastFogFar = useRef(0);
   const cityEnergyRef = useRef(cityEnergy);
-  cityEnergyRef.current = cityEnergy;
 
   // Global Time Cycle Logic
   useFrame(({ scene, clock }) => {
@@ -442,6 +459,9 @@ export default memo(function InstancedBuildings({
       lastFogNear.current = fog.near;
       lastFogFar.current = fog.far;
     }
+
+    // Sync dynamic uFoggyIntensity uniform
+    material.uniforms.uFoggyIntensity.value = foggyIntensity;
 
     const current = material.uniforms.uCityEnergy.value;
     const target = cityEnergyRef.current;
@@ -534,11 +554,17 @@ export default memo(function InstancedBuildings({
   const pointerNDC = useRef(new THREE.Vector2());
 
   const buildingsRef = useRef(buildings);
-  buildingsRef.current = buildings;
   const onClickRef = useRef(onBuildingClick);
-  onClickRef.current = onBuildingClick;
   const introRef = useRef(introMode);
-  introRef.current = introMode;
+
+  // Safely sync all reactive refs in an effect to comply with react-hooks/refs
+  useEffect(() => {
+    holdRiseRef.current = holdRise;
+    cityEnergyRef.current = cityEnergy;
+    buildingsRef.current = buildings;
+    onClickRef.current = onBuildingClick;
+    introRef.current = introMode;
+  }, [holdRise, cityEnergy, buildings, onBuildingClick, introMode]);
 
   const tapRef = useRef<{
     time: number;
@@ -577,7 +603,7 @@ export default memo(function InstancedBuildings({
       if (
         introRef.current ||
         wasAdPointerConsumed() ||
-        (window as any).__spireClicked
+        ((window as unknown) as { __spireClicked?: boolean }).__spireClicked
       )
         return;
       const id = raycastInstance(e.clientX, e.clientY);
@@ -617,7 +643,7 @@ export default memo(function InstancedBuildings({
             document.body.style.cursor = "auto";
             return;
           }
-          if ((window as any).__spireCursor) return;
+          if (((window as unknown) as { __spireCursor?: boolean }).__spireCursor) return;
           const now = performance.now();
           if (now - lastMoveTime < 125) return;
           lastMoveTime = now;

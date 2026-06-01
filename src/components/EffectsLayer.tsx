@@ -11,6 +11,7 @@ import {
   NeonOutline,
   ParticleAura,
   SpotlightEffect,
+  FoggyPointLights,
 } from "./BuildingEffects";
 import RaidTag3D from "./RaidTag3D";
 
@@ -78,6 +79,7 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
   isDimmed,
   isGhostTarget,
   ghostEffectId,
+  foggyIntensity = 0.0,
 }: {
   building: CityBuilding;
   accentColor: string;
@@ -85,6 +87,7 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
   isDimmed: boolean;
   isGhostTarget: boolean;
   ghostEffectId: number;
+  foggyIntensity?: number;
 }) {
   return (
     <group
@@ -96,6 +99,15 @@ const ActiveBuildingEffects = memo(function ActiveBuildingEffects({
           height={building.height}
           width={building.width}
           depth={building.depth}
+        />
+      )}
+
+      {/* Point light halo for claimed buildings under foggy conditions */}
+      {building.claimed && (
+        <FoggyPointLights
+          height={building.height}
+          color={accentColor}
+          foggyIntensity={foggyIntensity}
         />
       )}
 
@@ -201,12 +213,13 @@ interface EffectsLayerProps {
   introMode?: boolean;
   flyMode?: boolean;
   ghostPreviewLogin?: string | null;
+  foggyIntensity?: number;
 }
 
 export default function EffectsLayer({
   buildings,
   grid,
-  colors,
+  colors: _colors,
   accentColor,
   focusedBuilding,
   focusedBuildingB,
@@ -214,6 +227,7 @@ export default function EffectsLayer({
   introMode,
   flyMode,
   ghostPreviewLogin,
+  foggyIntensity = 0.0,
 }: EffectsLayerProps) {
   const lastUpdate = useRef(-1);
   const activeSetRef = useRef(new Set<number>());
@@ -371,6 +385,7 @@ export default function EffectsLayer({
             isDimmed={isDimmed}
             isGhostTarget={isGhostTarget}
             ghostEffectId={ghostEffectId}
+            foggyIntensity={foggyIntensity}
           />
         );
       })}

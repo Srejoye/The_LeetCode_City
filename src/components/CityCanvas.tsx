@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Stats } from "@react-three/drei";
 import * as THREE from "three";
+import { gsap } from "gsap";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
 import type { LiveSession } from "@/lib/useCodingPresence";
@@ -2012,6 +2013,7 @@ interface Props {
   wallpaperSpeed?: number;
   liveByLogin?: Map<string, LiveSession>;
   cityEnergy?: number;
+  weatherState?: "clear" | "rain" | "fog";
 }
 
 // Dynamically adjust scene exposure based on city energy (devs coding)
@@ -2034,8 +2036,46 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, weatherState = "clear" }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
+
+  const [foggyIntensity, setFoggyIntensity] = useState(0.0);
+  const [weatherTweenState, setWeatherTweenState] = useState({
+    lightIntensityMultiplier: 1.0,
+    fogDensityMultiplier: 0.0,
+  });
+
+  useEffect(() => {
+    const targets = {
+      intensity: foggyIntensity,
+      lightMult: weatherTweenState.lightIntensityMultiplier,
+      fogDensityMult: weatherTweenState.fogDensityMultiplier,
+    };
+
+    const targetIntensity = weatherState === "fog" ? 1.0 : 0.0;
+    const targetLightMult = weatherState === "fog" ? 0.35 : 1.0;
+    const targetFogDensityMult = weatherState === "fog" ? 1.0 : 0.0;
+
+    const tween = gsap.to(targets, {
+      intensity: targetIntensity,
+      lightMult: targetLightMult,
+      fogDensityMult: targetFogDensityMult,
+      duration: 2.2,
+      ease: "power2.out",
+      onUpdate: () => {
+        setFoggyIntensity(targets.intensity);
+        setWeatherTweenState({
+          lightIntensityMultiplier: targets.lightMult,
+          fogDensityMultiplier: targets.fogDensityMult,
+        });
+      },
+    });
+
+    return () => {
+      tween.kill();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherState]);
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
   const flyPosRef = useRef(new THREE.Vector3());
 
@@ -2061,8 +2101,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           // Also schedule a few post-mount traversal passes to catch textures created
           // by React components after initial renderer creation.
           const applyNearest = () => {
-            scene.traverse((obj: any) => {
-              if (obj.isMesh && obj.material) {
+            scene.traverse((obj: THREE.Object3D) => {
+              if (obj instanceof THREE.Mesh && obj.material) {
                 const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
                 for (const m of mats) {
                   const maps = [m.map, m.alphaMap, m.emissiveMap, m.roughnessMap, m.metalnessMap, m.normalMap];
@@ -2084,7 +2124,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           // Run a few frames afterwards to catch late-mounted textures
           let runs = 0;
           const runner = () => {
-            try { applyNearest(); } catch (err) { /* keep going */ }
+            try { applyNearest(); } catch { /* keep going */ }
             runs += 1;
             if (runs < 6) requestAnimationFrame(runner);
           };
@@ -2100,14 +2140,18 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
     >
       {showPerf && <Stats />}
       <CityExposure cityEnergy={cityEnergy ?? 1} />
-      <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
+      {weatherState === "fog" || foggyIntensity > 0.001 ? (
+        <fogExp2 attach="fog" args={[t.fogColor, 0.015 * weatherTweenState.fogDensityMultiplier]} />
+      ) : (
+        <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
+      )}
       <SceneBackground color={t.fogColor} key={`bg-${themeIndex}`} />
 
 
-      <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
-      <directionalLight position={t.sunPos} intensity={t.sunIntensity * 3.5} color={t.sunColor} />
-      <directionalLight position={t.fillPos} intensity={t.fillIntensity * 3} color={t.fillColor} />
-      <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5]} key={`hemi-${themeIndex}`} />
+      <ambientLight intensity={t.ambientIntensity * 3 * weatherTweenState.lightIntensityMultiplier} color={t.ambientColor} />
+      <directionalLight position={t.sunPos} intensity={t.sunIntensity * 3.5 * weatherTweenState.lightIntensityMultiplier} color={t.sunColor} />
+      <directionalLight position={t.fillPos} intensity={t.fillIntensity * 3 * weatherTweenState.lightIntensityMultiplier} color={t.fillColor} />
+      <hemisphereLight args={[t.hemiSky, t.hemiGround, t.hemiIntensity * 3.5 * weatherTweenState.lightIntensityMultiplier]} key={`hemi-${themeIndex}`} />
 
       <SkyDome key={`sky-${themeIndex}`} stops={t.sky} />
 
@@ -2187,9 +2231,14 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
         holdRise={holdRise}
         liveByLogin={liveByLogin}
         cityEnergy={cityEnergy}
+        weatherState={weatherState}
+        foggyIntensity={foggyIntensity}
+        fogColor={t.fogColor}
       />
 
       <InstancedDecorations items={decorations} roadMarkingColor={t.roadMarkingColor} sidewalkColor={t.sidewalkColor} />
+
+
 
       {!wallpaperMode && skyAds && skyAds.length > 0 && (
         <>

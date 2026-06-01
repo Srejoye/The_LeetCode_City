@@ -2048,3 +2048,61 @@ export const BinaryTree = memo(function BinaryTree({
     </group>
   );
 });
+
+// ─── Foggy Point Lights (weather effect - premium) ───────────
+// Soft, glowing volumetric point lights + halos fading in during fog
+
+export const FoggyPointLights = memo(function FoggyPointLights({
+  height,
+  color = "#ffa116",
+  foggyIntensity = 0.0,
+}: {
+  height: number;
+  color?: string;
+  foggyIntensity?: number;
+}) {
+  const glowTex = useMemo(() => {
+    const size = 128;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+    
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, color);
+    grad.addColorStop(0.2, color);
+    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, [color]);
+
+  if (foggyIntensity <= 0.001) return null;
+
+  return (
+    <group position={[0, height + 2, 0]}>
+      {/* Dynamic soft physical light */}
+      <pointLight
+        color={color}
+        intensity={foggyIntensity * 12.0}
+        distance={70}
+        decay={1.6}
+      />
+      {/* Volumetric glow sprite */}
+      <sprite scale={[22 * foggyIntensity, 22 * foggyIntensity, 1]}>
+        <spriteMaterial
+          map={glowTex}
+          transparent
+          opacity={foggyIntensity * 0.7}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </sprite>
+    </group>
+  );
+});
+

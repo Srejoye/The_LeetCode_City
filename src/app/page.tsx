@@ -567,6 +567,64 @@ function HomeContent() {
   const [introPhase, setIntroPhase] = useState(-1); // -1 = not started, 0-3 = text phases, 4 = done
   const [exploreMode, setExploreMode] = useState(false);
   const [themeIndex, setThemeIndex] = useState(0);
+  const [weatherState, setWeatherState] = useState<"clear" | "rain" | "fog">("clear");
+  const [weatherMode, setWeatherMode] = useState<"clear" | "rain" | "fog" | "live">("clear");
+
+  const cycleWeather = useCallback(() => {
+    setWeatherMode((prev) => {
+      if (prev === "clear") return "rain";
+      if (prev === "rain") return "fog";
+      if (prev === "fog") return "live";
+      return "clear";
+    });
+  }, []);
+
+  const fetchLiveWeather = useCallback(async () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setWeatherState("clear");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const res = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=weather_code`
+          );
+          const data = await res.json();
+          const code = data?.current?.weather_code;
+
+          if (code === 45 || code === 48) {
+            setWeatherState("fog");
+          } else if (
+            (code >= 51 && code <= 67) ||
+            (code >= 80 && code <= 82) ||
+            code === 95 || code === 96 || code === 99
+          ) {
+            setWeatherState("rain");
+          } else {
+            setWeatherState("clear");
+          }
+        } catch (err) {
+          setWeatherState("clear");
+        }
+      },
+      (error) => {
+        setWeatherState("clear");
+      }
+    );
+  }, []);
+
+  useEffect(() => {
+    if (weatherMode === "live") {
+      fetchLiveWeather();
+      const interval = setInterval(fetchLiveWeather, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    } else {
+      setWeatherState(weatherMode);
+    }
+  }, [weatherMode, fetchLiveWeather]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2660,6 +2718,7 @@ function HomeContent() {
         focusedBuilding={focusedBuilding}
         focusedBuildingB={focusedBuildingB}
         accentColor={theme.accent}
+        weatherState={weatherState}
         onClearFocus={() => setFocusedBuilding(null)}
         flyPauseSignal={flyPauseSignal}
         flyHasOverlay={!!selectedBuilding}
@@ -3257,6 +3316,27 @@ function HomeContent() {
                 {themeIndex + 1}/{THEMES.length}
               </span>
             </button>
+
+            {/* Weather switcher */}
+            <button
+              onClick={cycleWeather}
+              className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+              title="Cycle weather"
+            >
+              <span style={{ color: theme.accent }}>
+                {weatherMode === "clear" && "☀️"}
+                {weatherMode === "rain" && "🌧️"}
+                {weatherMode === "fog" && "🌫️"}
+                {weatherMode === "live" && "📡"}
+              </span>
+              <span className="text-cream">
+                {weatherMode === "clear" && "CLEAR"}
+                {weatherMode === "rain" && "RAIN"}
+                {weatherMode === "fog" && "FOG"}
+                {weatherMode === "live" && "LIVE"}
+              </span>
+            </button>
+
             {isMounted && <div id="gc-radio-slot" />}
           </div>
 
@@ -5629,6 +5709,8 @@ function HomeContent() {
             themeIndex={themeIndex}
             themesLength={THEMES.length}
             isMounted={isMounted}
+            cycleWeather={cycleWeather}
+            weatherMode={weatherMode}
           />
         </div>
       )}
