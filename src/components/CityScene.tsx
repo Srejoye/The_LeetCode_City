@@ -8,6 +8,7 @@ import InstancedBuildings from "./InstancedBuildings";
 import InstancedLabels from "./InstancedLabels";
 import EffectsLayer from "./EffectsLayer";
 import LiveDots from "./LiveDots";
+import WindyWeather from "./WindyWeather";
 import type { LiveSession } from "@/lib/useCodingPresence";
 import type { CityBuilding } from "@/lib/github";
 import type { BuildingColors } from "./CityCanvas";
@@ -291,7 +292,12 @@ export default function CityScene({
         ghostPreviewLogin={ghostPreviewLogin}
       />
 
-      {!introMode && <RainWeather />}
+      {!introMode && (
+        <>
+          <RainWeather />
+          <WindyWeather />
+        </>
+      )}
 
       {!introMode && focusedBuildingData && (
         <group
