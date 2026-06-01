@@ -639,24 +639,37 @@ function HomeContent() {
   });
   const [vsCodeKeyLoading, setVsCodeKeyLoading] = useState(false);
   const [vsCodeKeyCopied, setVsCodeKeyCopied] = useState(false);
+  const [vsCodeKeyError, setVsCodeKeyError] = useState<string | null>(null);
   const [codingPanelOpen, setCodingPanelOpen] = useState(false);
 
   useEffect(() => {
     if (codingPanelOpen && hasVsCodeKey === null) {
       fetch(`/api/vscode-key?t=${Date.now()}`, { cache: "no-store" })
-        .then(r => r.json())
-        .then(d => {
-          if (typeof d.hasKey === "boolean") {
-            setHasVsCodeKey(d.hasKey);
-            try {
-              if (d.hasKey) localStorage.setItem("leetcodecity_has_vscode_key", "1");
-              else localStorage.removeItem("leetcodecity_has_vscode_key");
-            } catch {}
+        .then(async (r) => {
+          if (r.status === 404) {
+            setVsCodeKeyError("claim_required");
+            setHasVsCodeKey(false);
+            return;
+          }
+          try {
+            const d = await r.json();
+            if (r.ok && typeof d.hasKey === "boolean") {
+              setHasVsCodeKey(d.hasKey);
+              try {
+                if (d.hasKey) localStorage.setItem("leetcodecity_has_vscode_key", "1");
+                else localStorage.removeItem("leetcodecity_has_vscode_key");
+              } catch {}
+            } else {
+              setHasVsCodeKey(false);
+            }
+          } catch {
+            setHasVsCodeKey(false);
           }
         })
-        .catch(() => {});
+        .catch(() => { setHasVsCodeKey(false); });
     }
   }, [codingPanelOpen, hasVsCodeKey]);
+
   const [session, setSession] = useState<Session | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [purchasedItem, setPurchasedItem] = useState<string | null>(null);
@@ -3218,13 +3231,6 @@ function HomeContent() {
         open={analyticsOpen}
         onClose={() => setAnalyticsOpen(false)}
       />
-      <button
-        onClick={() => setAnalyticsOpen((v) => !v)}
-        className={`fixed top-[52px] right-3 z-40 border border-border bg-bg/90 px-2 py-1 text-[9px] transition-colors hover:border-border-light sm:top-[60px] sm:right-4 ${codingPanelOpen ? "hidden" : ""}`}
-        style={{ color: analyticsOpen ? "#ffa116" : "#8c8c9c" }}
-      >
-        [ANALYTICS]
-      </button>
 
       {/* ─── Explore Mode: minimal UI ─── */}
       {exploreMode && !flyMode && (
@@ -3271,7 +3277,7 @@ function HomeContent() {
 
           {/* Feed toggle (top-right, below LeetCode badges on desktop) */}
           {feedEvents.length >= 1 && (
-            <div className="pointer-events-auto absolute top-3 right-3 sm:top-14 sm:right-4">
+            <div className="pointer-events-auto absolute top-3 right-3 sm:top-[60px] sm:right-4">
               <button
                 onClick={() => setFeedPanelOpen(true)}
                 className="flex items-center gap-2 border-[3px] border-border bg-bg/70 px-3 py-1.5 text-[10px] backdrop-blur-sm transition-colors"
@@ -3365,6 +3371,13 @@ function HomeContent() {
               <span className="hidden sm:inline text-muted">live</span>
             </div>
           )}
+          <button
+            onClick={() => setAnalyticsOpen((v) => !v)}
+            className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
+            style={{ color: analyticsOpen ? "#ffa116" : "#8c8c9c" }}
+          >
+            [ANALYTICS]
+          </button>
           {(() => {
             const energyLabel =
               codingCount === 0
@@ -3621,6 +3634,28 @@ function HomeContent() {
                                 Lost your key? Set up again &rarr;
                               </button>
                             </div>
+                                                    ) : vsCodeKeyError === "claim_required" || !myBuilding?.claimed ? (
+                            <div className="px-5 py-5">
+                              <p className="mb-3 text-sm normal-case text-cream font-bold">
+                                VS Code Extension
+                              </p>
+                              <p className="mb-3 text-[11px] normal-case text-muted">
+                                Claim your building first to use the VS Code extension and keep your city alive while you code.
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setCodingPanelOpen(false);
+                                  setShowLinkModal(true);
+                                }}
+                                className="btn-press w-full py-2.5 text-center text-xs text-bg"
+                                style={{
+                                  backgroundColor: theme.accent,
+                                  boxShadow: "2px 2px 0 0 " + theme.shadow,
+                                }}
+                              >
+                                Claim Your Building
+                              </button>
+                            </div>
                           ) : (
                             <div className="px-5 py-5">
                               <p className="mb-3 text-sm normal-case text-cream font-bold">
@@ -3655,12 +3690,23 @@ function HomeContent() {
                               <button
                                 onClick={async () => {
                                   setVsCodeKeyLoading(true);
+                                  setVsCodeKeyError(null);
                                   try {
                                     const res = await fetch("/api/vscode-key", {
                                       method: "POST",
                                     });
-                                    const data = await res.json();
-                                    if (data.key) {
+                                    if (res.status === 404) {
+                                      setVsCodeKeyError("claim_required");
+                                      return;
+                                    }
+                                    let data;
+                                    try {
+                                      data = await res.json();
+                                    } catch {
+                                      setVsCodeKeyError("Failed to generate key. Please try again.");
+                                      return;
+                                    }
+                                    if (res.ok && data.key) {
                                       setVsCodeKey(data.key);
                                       setHasVsCodeKey(true);
                                       try { localStorage.setItem("leetcodecity_has_vscode_key", "1"); } catch {}
@@ -3670,7 +3716,11 @@ function HomeContent() {
                                         () => setVsCodeKeyCopied(false),
                                         2000,
                                       );
+                                    } else {
+                                      setVsCodeKeyError(data.error || "Failed to generate key. Please try again.");
                                     }
+                                  } catch {
+                                    setVsCodeKeyError("Network error. Please try again.");
                                   } finally {
                                     setVsCodeKeyLoading(false);
                                   }
@@ -3693,6 +3743,11 @@ function HomeContent() {
                                 publicly. You can control this in VS Code
                                 Settings &gt; LeetCode City &gt; Privacy.
                               </p>
+                              {vsCodeKeyError && vsCodeKeyError !== "claim_required" && (
+                                <p role="alert" className="mt-2 text-[10px] normal-case text-red-400">
+                                  {vsCodeKeyError}
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
