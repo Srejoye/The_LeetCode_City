@@ -2,8 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, useGLTF, Stats, PerformanceMonitor } from "@react-three/drei";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
+import { OrbitControls, useGLTF, Stats } from "@react-three/drei";
 import * as THREE from "three";
 import CityScene from "./CityScene";
 import type { FocusInfo } from "./CityScene";
@@ -1939,8 +1938,6 @@ const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4
 export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy }: Props) {
   const t = THEMES[themeIndex] ?? THEMES[0];
   const showPerf = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("perf");
-  const [dpr, setDpr] = useState(1);
-  const [bloomEnabled, setBloomEnabled] = useState(false);
   const flyPosRef = useRef(new THREE.Vector3());
 
   const cityRadius = useMemo(() => {
@@ -1955,7 +1952,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
   return (
     <Canvas
       camera={{ position: [400, 450, 600], fov: 55, near: 0.5, far: 4000 }}
-      dpr={Array.isArray(dpr) ? dpr : [dpr, dpr]}
+      dpr={1}
       onCreated={({ gl, scene }) => {
         try {
           // Keep the canvas pixelated via CSS; don't override the Canvas `dpr` prop here
@@ -2004,11 +2001,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
     >
       {showPerf && <Stats />}
       <CityExposure cityEnergy={cityEnergy ?? 1} />
-      <PerformanceMonitor
-        onIncline={() => { setDpr(1.25); setBloomEnabled(true); }}
-        onDecline={() => { setDpr(0.75); setBloomEnabled(false); }}
-      />
       <fog attach="fog" args={[t.fogColor, t.fogNear, t.fogFar]} key={`fog-${themeIndex}`} />
+
 
       <ambientLight intensity={t.ambientIntensity * 3} color={t.ambientColor} />
       <directionalLight position={t.sunPos} intensity={t.sunIntensity * 3.5} color={t.sunColor} />
@@ -2117,17 +2111,6 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
             focusedBuildingB={raidPhase && raidPhase !== "idle" && raidPhase !== "preview" && raidPhase !== "share" && raidPhase !== "done" ? (raidAttacker?.login ?? null) : focusedBuildingB}
           />
         </>
-      )}
-
-      {bloomEnabled && (
-        <EffectComposer multisampling={0}>
-          <Bloom
-            mipmapBlur
-            luminanceThreshold={1}
-            luminanceSmoothing={0.3}
-            intensity={1.8 * Math.max(0.15, cityEnergy ?? 1)}
-          />
-        </EffectComposer>
       )}
     </Canvas>
   );
