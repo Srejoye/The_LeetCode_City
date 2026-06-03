@@ -3,6 +3,7 @@ import Skeleton from "@/components/Skeleton";
 import SearchBar from "@/components/SearchBar";
 import UserProfile from "@/components/UserProfile";
 import ActionToolbar from "@/components/ActionToolbar";
+import CodexModal from "@/components/CodexModal";
 
 import {
   useState,
@@ -129,10 +130,8 @@ const TIER_EMOJI_MAP: Record<string, string> = {
 const ACHIEVEMENT_TIERS_MAP: Record<string, string> = {
   god_mode: "diamond",
   legend: "diamond",
-  famous: "diamond",
   mayor: "diamond",
   machine: "gold",
-  popular: "gold",
   factory: "gold",
   influencer: "gold",
   philanthropist: "gold",
@@ -146,7 +145,6 @@ const ACHIEVEMENT_TIERS_MAP: Record<string, string> = {
   first_push: "bronze",
   committed: "bronze",
   builder: "bronze",
-  rising_star: "bronze",
   recruiter: "bronze",
   generous: "bronze",
   gifted: "bronze",
@@ -161,23 +159,23 @@ const ACHIEVEMENT_TIERS_MAP: Record<string, string> = {
   daily_regular: "silver",
   daily_master: "gold",
   daily_legend: "diamond",
+  contrib_planner: "silver",
+  contrib_architect: "gold",
+  contrib_founder: "diamond",
 };
 const ACHIEVEMENT_NAMES_MAP: Record<string, string> = {
   god_mode: "God Mode",
-  legend: "Legend",
-  famous: "Famous",
+  legend: "Grandmaster",
   mayor: "Mayor",
-  machine: "Machine",
-  popular: "Popular",
-  factory: "Factory",
+  machine: "Algorithmist",
+  factory: "Hardcore",
   influencer: "Influencer",
   grinder: "Grinder",
-  architect: "Architect",
-  builder: "Builder",
-  rising_star: "Rising Star",
+  architect: "Medium Master",
+  builder: "Easy Breezy",
   recruiter: "Recruiter",
-  committed: "Committed",
-  first_push: "First Push",
+  committed: "Problem Solver",
+  first_push: "First Blood",
   philanthropist: "Philanthropist",
   patron: "Patron",
   generous: "Generous",
@@ -197,6 +195,9 @@ const ACHIEVEMENT_NAMES_MAP: Record<string, string> = {
   daily_regular: "Daily Regular",
   daily_master: "Daily Master",
   daily_legend: "Daily Legend",
+  contrib_planner: "City Planner",
+  contrib_architect: "Architect",
+  contrib_founder: "Founding Father",
 };
 
 // Dev "class" — funny RPG-style title, deterministic per username
@@ -575,6 +576,7 @@ function HomeContent() {
   const [introPhase, setIntroPhase] = useState(-1); // -1 = not started, 0-3 = text phases, 4 = done
   const [exploreMode, setExploreMode] = useState(false);
   const [themeIndex, setThemeIndex] = useState(0);
+  const [isCodexOpen, setIsCodexOpen] = useState(false);
   const [dayNightCycleActive, setDayNightCycleActive] = useState(true);
   const [weatherMode, setWeatherMode] = useState<"sunny" | "rainy" | "windy" | "stormy" | "snowy">("sunny");
 
@@ -4344,6 +4346,19 @@ function HomeContent() {
                   </>
                 )}
               </div>
+
+              {/* Codex Button */}
+              <button
+                onClick={() => setIsCodexOpen(true)}
+                className="btn-press flex items-center justify-center border-[3px] border-border bg-bg/95 py-0.5 text-[10px] backdrop-blur-sm transition-all hover:border-border-light text-cream font-bold shadow-md w-28 sm:w-32"
+                style={{
+                  borderColor: theme.accent,
+                  boxShadow: `3px 3px 0 0 ${theme.shadow}`,
+                }}
+                title="Open Codex"
+              >
+                <span>CODEX</span>
+              </button>
             </div>
           )}
 
@@ -5780,6 +5795,13 @@ function HomeContent() {
           </div>
         </div>
       )}
+
+      <CodexModal
+        isOpen={isCodexOpen}
+        onClose={() => setIsCodexOpen(false)}
+        accentColor={theme.accent}
+        shadowColor={theme.shadow}
+      />
 
       {/* ─── Bottom-left controls: Theme + Radio (portal slot) + Intro ─── */}
       {!flyMode && !introMode && !rabbitCinematic && !exploreMode && (

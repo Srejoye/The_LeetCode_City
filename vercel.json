@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/sync-arena-problems",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/monthly-sync",
+      "schedule": "0 0 28 * *"
     }
   ]
 }

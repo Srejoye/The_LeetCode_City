@@ -25,6 +25,13 @@ type DeveloperRow = {
   current_week_kudos_received?: number | null;
 
   owned_items?: string[];
+
+  easy_solved?: number | null;
+  medium_solved?: number | null;
+  hard_solved?: number | null;
+  contest_rating?: number | null;
+  lc_streak?: number | null;
+  total_prs?: number | null;
 };
 
 type DeveloperResult = PromiseLike<{ data: DeveloperRow | null }>;

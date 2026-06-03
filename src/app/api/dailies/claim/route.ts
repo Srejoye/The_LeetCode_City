@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   const { data: dev } = await admin
     .from("developers")
-    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, dailies_completed, dailies_streak, last_dailies_date")
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, dailies_completed, dailies_streak, last_dailies_date, easy_solved, medium_solved, hard_solved, contest_rating, lc_streak, total_prs")
     .eq("claimed_by", user.id)
     .single();
 
@@ -134,6 +134,12 @@ export async function POST(request: Request) {
       gifts_sent: 0,
       gifts_received: 0,
       dailies_completed: claimResult.total,
+      easy_solved: dev.easy_solved ?? 0,
+      medium_solved: dev.medium_solved ?? 0,
+      hard_solved: dev.hard_solved ?? 0,
+      contest_rating: dev.contest_rating ?? 0,
+      lc_streak: dev.lc_streak ?? 0,
+      total_prs: dev.total_prs ?? 0,
     },
     githubLogin,
   );

@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   // Fetch giver (must have claimed building)
   const { data: giver } = await admin
     .from("developers")
-    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, kudos_streak, last_kudos_given_date")
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, kudos_streak, last_kudos_given_date, easy_solved, medium_solved, hard_solved, contest_rating, lc_streak, total_prs")
     .eq("claimed_by", user.id)
     .single();
 
@@ -148,6 +148,12 @@ export async function POST(request: Request) {
       gifts_sent: 0,
       gifts_received: 0,
       kudos_streak: newKudosStreak,
+      easy_solved: giver.easy_solved ?? 0,
+      medium_solved: giver.medium_solved ?? 0,
+      hard_solved: giver.hard_solved ?? 0,
+      contest_rating: giver.contest_rating ?? 0,
+      lc_streak: giver.lc_streak ?? 0,
+      total_prs: giver.total_prs ?? 0,
     }, githubLogin);
   }
 

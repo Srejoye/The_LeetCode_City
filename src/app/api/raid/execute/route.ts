@@ -41,6 +41,12 @@ type RaidDeveloper = {
   current_week_kudos_received?: number | null;
   last_raided_at?: string | null;
   active_defenses?: unknown;
+  easy_solved?: number | null;
+  medium_solved?: number | null;
+  hard_solved?: number | null;
+  contest_rating?: number | null;
+  lc_streak?: number | null;
+  total_prs?: number | null;
 };
 
 /**
@@ -80,7 +86,7 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdmin();
 
   // Fetch attacker + defender in parallel
-  const raidColumns = "id, claimed, github_login, avatar_url, contributions, public_repos, total_stars, kudos_count, app_streak, raid_xp, xp_level, current_week_contributions, current_week_kudos_given, current_week_kudos_received, last_raided_at, active_defenses";
+  const raidColumns = "id, claimed, github_login, avatar_url, contributions, public_repos, total_stars, kudos_count, app_streak, raid_xp, xp_level, current_week_contributions, current_week_kudos_given, current_week_kudos_received, last_raided_at, active_defenses, easy_solved, medium_solved, hard_solved, contest_rating, lc_streak, total_prs";
   const [attacker, defenderRes] = await Promise.all([
     findRaidAttackerForUser(admin, user, raidColumns),
     admin
@@ -532,6 +538,12 @@ export async function POST(request: Request) {
           gifts_sent: 0,
           gifts_received: 0,
           raid_xp: newAttackerXp,
+          easy_solved: attacker.easy_solved ?? 0,
+          medium_solved: attacker.medium_solved ?? 0,
+          hard_solved: attacker.hard_solved ?? 0,
+          contest_rating: attacker.contest_rating ?? 0,
+          lc_streak: attacker.lc_streak ?? 0,
+          total_prs: attacker.total_prs ?? 0,
         },
         attacker.github_login,
       ),
@@ -546,6 +558,12 @@ export async function POST(request: Request) {
           gifts_sent: 0,
           gifts_received: 0,
           raid_xp: newDefenderXp,
+          easy_solved: defender.easy_solved ?? 0,
+          medium_solved: defender.medium_solved ?? 0,
+          hard_solved: defender.hard_solved ?? 0,
+          contest_rating: defender.contest_rating ?? 0,
+          lc_streak: defender.lc_streak ?? 0,
+          total_prs: defender.total_prs ?? 0,
         },
         defender.github_login,
       ),

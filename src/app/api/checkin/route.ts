@@ -111,7 +111,7 @@ export async function POST(request: Request) {
   // Fetch developer (must be claimed)
   const { data: dev } = await sb
     .from("developers")
-    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, app_streak, streak_freeze_30d_claimed, last_checkin_date")
+    .select("id, github_login, claimed, contributions, public_repos, total_stars, kudos_count, app_streak, streak_freeze_30d_claimed, last_checkin_date, easy_solved, medium_solved, hard_solved, contest_rating, lc_streak, total_prs")
     .eq("claimed_by", user.id)
     .single();
 
@@ -185,6 +185,12 @@ export async function POST(request: Request) {
       gifts_sent: giftsSent,
       gifts_received: giftsReceived,
       app_streak: checkinResult.streak,
+      easy_solved: dev.easy_solved ?? 0,
+      medium_solved: dev.medium_solved ?? 0,
+      hard_solved: dev.hard_solved ?? 0,
+      contest_rating: dev.contest_rating ?? 0,
+      lc_streak: dev.lc_streak ?? 0,
+      total_prs: dev.total_prs ?? 0,
     }, githubLogin);
 
     // Grant 1 free freeze at 30-day streak milestone
