@@ -185,11 +185,12 @@ export async function POST(request: Request) {
   let streakReward: { milestone: number; item_id: string; item_name: string } | null = null;
   let xpResult: { granted: number; new_total: number; new_level: number } | null = null;
 
+  const today = new Date().toISOString().split("T")[0];
+
   // Grant XP for check-in — idempotent via unique (developer_id, source, date) insert.
   // If two cold instances both reach here, only the first INSERT wins; the second
   // sees a 23505 conflict and skips the grant entirely.
   if (checkinResult.checked_in) {
-    const today = new Date().toISOString().split("T")[0];
     const { error: xpLogError } = await sb
       .from("checkin_xp_log")
       .insert({ developer_id: dev.id, granted_date: today })
