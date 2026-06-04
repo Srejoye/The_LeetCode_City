@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     // Use an optimistic-lock WHERE clause so that only the first of any
     // concurrent sighting-5 requests commits; the rest see rowCount = 0
     // and return early before touching purchases.
-    const { count, error } = await admin
+    const { data, error } = await admin
       .from("developers")
       .update({
         rabbit_progress: 5,
@@ -68,14 +68,14 @@ export async function POST(request: Request) {
       })
       .eq("id", dev.id)
       .eq("rabbit_completed", false)   // optimistic lock: only win the race once
-      .select("id", { count: "exact", head: true });
+      .select("id");
 
     if (error) {
       return NextResponse.json({ error: "Failed to update" }, { status: 500 });
     }
 
     // Another concurrent request already completed the quest — nothing to do.
-    if (!count || count === 0) {
+    if (!data || data.length === 0) {
       return NextResponse.json({ progress: 5, completed: true });
     }
 
