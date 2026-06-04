@@ -810,6 +810,27 @@ export default function ShopClient({
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasChanges]);
 
+  // Save billboard local override on changes
+  const isFirstBillboardRender = useRef(true);
+  useEffect(() => {
+    if (isFirstBillboardRender.current) {
+      isFirstBillboardRender.current = false;
+      return;
+    }
+    try {
+      if (billboardImages && billboardImages.length > 0) {
+        localStorage.setItem(
+          "leetcodecity:billboard_override",
+          JSON.stringify({ developerId, value: billboardImages, ts: Date.now() })
+        );
+      } else {
+        localStorage.removeItem("leetcodecity:billboard_override");
+      }
+    } catch (err) {
+      console.warn("[ShopClient] Failed to save billboard override:", err);
+    }
+  }, [billboardImages, developerId]);
+
   // Auto-upload pending billboard image after purchase redirect
   useEffect(() => {
     if (billboardSlots <= 0) return;
@@ -945,17 +966,25 @@ export default function ShopClient({
         setSavedCustomization(itemId);
         setTimeout(() => setSavedCustomization(null), 2000);
         try{
-          if (itemId === "custom_color" && payload.color) {
-            localStorage.setItem(
-              "leetcodecity:color_override",
-              JSON.stringify({ developerId, value: payload.color, ts: Date.now() })
-            );
+          if (itemId === "custom_color") {
+            if (payload.color) {
+              localStorage.setItem(
+                "leetcodecity:color_override",
+                JSON.stringify({ developerId, value: payload.color, ts: Date.now() })
+              );
+            } else {
+              localStorage.removeItem("leetcodecity:color_override");
+            }
           }
-          if (itemId === "billboard" && payload.images) {
-            localStorage.setItem(
-              "leetcodecity:billboard_override",
-              JSON.stringify({ developerId, value: payload.images, ts: Date.now() })
-            )
+          if (itemId === "led_banner") {
+            if (payload.text) {
+              localStorage.setItem(
+                "leetcodecity:led_banner_override",
+                JSON.stringify({ developerId, value: payload.text, ts: Date.now() })
+              );
+            } else {
+              localStorage.removeItem("leetcodecity:led_banner_override");
+            }
           }
         } catch (err) {
             console.warn("[ShopClient] localStorage write failed:", err);

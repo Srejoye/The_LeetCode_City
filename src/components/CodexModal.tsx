@@ -12,6 +12,7 @@ interface CodexModalProps {
 
 interface CodexData {
   loggedIn: boolean;
+  developerId?: number;
   stats: Record<string, any> | null;
   unlockedAchievements: string[];
   ownedItems: string[];
@@ -131,6 +132,20 @@ export default function CodexModal({ isOpen, onClose, accentColor, shadowColor }
       const resData = await res.json();
       if (res.ok && resData.success) {
         setSelectedTitle(resData.slug);
+        if (data && data.developerId) {
+          try {
+            if (resData.slug) {
+              localStorage.setItem(
+                "leetcodecity:selected_title_override",
+                JSON.stringify({ developerId: data.developerId, value: resData.slug, ts: Date.now() })
+              );
+            } else {
+              localStorage.removeItem("leetcodecity:selected_title_override");
+            }
+          } catch (e) {
+            console.warn("[CodexModal] Failed to set title override:", e);
+          }
+        }
       } else {
         alert(resData.error || "Failed to save title customization");
       }

@@ -129,6 +129,7 @@ export async function GET() {
 
     return NextResponse.json({
       loggedIn: true,
+      developerId: dev.id,
       stats,
       unlockedAchievements,
       ownedItems,
