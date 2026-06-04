@@ -179,10 +179,30 @@ export async function POST(request: Request) {
   let streakReward: { milestone: number; item_id: string; item_name: string } | null = null;
   let xpResult: { granted: number; new_total: number; new_level: number } | null = null;
 
-  // Grant XP for check-in
+  // Grant XP for check-in — idempotent via unique (developer_id, source, date) insert.
+  // If two cold instances both reach here, only the first INSERT wins; the second
+  // sees a 23505 conflict and skips the grant entirely.
   if (checkinResult.checked_in) {
-    const { data: xpData } = await sb.rpc("grant_xp", { p_developer_id: dev.id, p_source: "checkin", p_amount: 10 });
-    if (xpData) xpResult = xpData as { granted: number; new_total: number; new_level: number };
+    const today = new Date().toISOString().split("T")[0];
+    const { error: xpLogError } = await sb
+      .from("checkin_xp_log")
+      .insert({ developer_id: dev.id, granted_date: today })
+      .select("id")
+      .maybeSingle();
+
+    if (!xpLogError) {
+      // Insert succeeded — we are the first instance, safe to grant XP
+      const { data: xpData } = await sb.rpc("grant_xp", {
+        p_developer_id: dev.id,
+        p_source: "checkin",
+        p_amount: 10,
+      });
+      if (xpData) xpResult = xpData as { granted: number; new_total: number; new_level: number };
+    } else if (!xpLogError.code?.includes("23505")) {
+      // Unexpected error (not a duplicate) — log but don't crash
+      console.error("[checkin] checkin_xp_log insert error:", xpLogError);
+    }
+    // 23505 = duplicate, another instance already granted XP today — skip silently
   }
 
   if (checkinResult.checked_in) {
@@ -215,11 +235,10 @@ export async function POST(request: Request) {
         .from("developers")
         .update({ streak_freeze_30d_claimed: true })
         .eq("id", dev.id);
-      await sb.from("streak_freeze_log").insert({
-        developer_id: dev.id,
-        action: "granted_milestone",
-      });
-    }
+      await sb.from("streak_freeze_log").upsert(
+        { developer_id: dev.id, action: "granted_milestone", granted_date: today },
+        { onConflict: "developer_id,action,granted_date", ignoreDuplicates: true }
+      );
 
     // A12: Streak rewards - grant free items at milestones
     streakReward = await grantStreakReward(sb, dev.id, checkinResult.streak);
@@ -235,18 +254,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Insert feed event
-    await sb.from("activity_feed").insert({
-      event_type: "streak_checkin",
-      actor_id: dev.id,
-      metadata: {
-        login: githubLogin,
-        streak: checkinResult.streak,
-        was_frozen: checkinResult.was_frozen ?? false,
-        reward: streakReward?.item_id ?? null,
+    // Upsert feed event — unique on (actor_id, event_type, event_date) so concurrent
+    // instances produce exactly one row rather than two.
+    const eventDate = new Date().toISOString().split("T")[0];
+    await sb.from("activity_feed").upsert(
+      {
+        event_type: "streak_checkin",
+        actor_id: dev.id,
+        event_date: eventDate,
+        metadata: {
+          login: githubLogin,
+          streak: checkinResult.streak,
+          was_frozen: checkinResult.was_frozen ?? false,
+          reward: streakReward?.item_id ?? null,
+        },
       },
-    });
-  }
+      { onConflict: "actor_id,event_type,event_date", ignoreDuplicates: true }
+    );
 
   // Refresh weekly contributions from LeetCode
   const weeklyContribs = await fetchWeeklyContributions(githubLogin);
