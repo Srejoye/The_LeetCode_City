@@ -1989,6 +1989,16 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 // Plaza indices for rabbit sightings (progressively further from center)
 const RABBIT_PLAZA_INDICES = [1, 2, 4, 7, 10]; // plazas[1]=slot3, [2]=slot7, [4]=slot18, [7]=slot42, [10]=slot75
 
+function GLCleanup() {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    return () => {
+      try { gl.forceContextLoss(); } catch { /* best-effort */ }
+    };
+  }, []);
+  return null;
+}
+
 export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, dayNightCycleActive, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, weatherMode = "sunny" }: Props) {
   const { isRaining } = useWeather();
   const t = THEMES[themeIndex] ?? THEMES[0];
@@ -2055,6 +2065,7 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
       style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh" }}
     >
+      <GLCleanup />
       {showPerf && <Stats />}
       <CityExposure cityEnergy={cityEnergy ?? 1} />
       <AtmosphereCycleManager
