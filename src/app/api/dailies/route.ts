@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
   // Auto-track checkin if user already checked in today (catches pre-deploy sessions)
   if (dev.last_checkin_date === today) {
-    await trackDailyMission(dev.id, "checkin");
+    await trackDailyMission(dev.id, "checkin", { isMobile });  // ← forward isMobile
   }
 
   const { searchParams } = new URL(request.url);
