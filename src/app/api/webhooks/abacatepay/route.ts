@@ -82,24 +82,26 @@ export async function POST(request: Request) {
           break;
         }
 
-        // --- Shop item purchase ---
-        const { data: purchase } = await sb
+        // Atomic claim: prevents duplicate fulfillment on PIX webhook retries.
+        const { data: claimed } = await sb
           .from("purchases")
-          .select("id, status, developer_id, item_id, gifted_to")
+          .update({ status: "processing" })
           .eq("provider_tx_id", pixId)
           .eq("provider", "abacatepay")
+          .eq("status", "pending")
+          .select("id, developer_id, item_id, gifted_to")
           .maybeSingle();
 
-        if (purchase && purchase.status === "pending") {
-          const ownerId = purchase.gifted_to ?? purchase.developer_id;
-          const { status: purchaseStatus } = await fulfillItemPurchase(ownerId, purchase.item_id, sb);
+        if (claimed) {
+          const ownerId = claimed.gifted_to ?? claimed.developer_id;
+          const { status: purchaseStatus } = await fulfillItemPurchase(ownerId, claimed.item_id, sb);
 
           await sb
             .from("purchases")
             .update({ status: purchaseStatus })
-            .eq("id", purchase.id);
+            .eq("id", claimed.id);
 
-          const fullPurchase = purchase;
+          const fullPurchase = claimed;
 
           if (fullPurchase) {
             const itemOwner = fullPurchase.gifted_to ?? fullPurchase.developer_id;
@@ -123,15 +125,15 @@ export async function POST(request: Request) {
                 target_id: fullPurchase.gifted_to,
                 metadata: { giver_login: dev?.github_login, receiver_login: receiver?.github_login, item_id: fullPurchase.item_id },
               });
-              sendGiftSentNotification(fullPurchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id);
-              sendGiftReceivedNotification(fullPurchase.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", purchase.id, fullPurchase.item_id);
+              sendGiftSentNotification(fullPurchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", claimed.id, fullPurchase.item_id);
+              sendGiftReceivedNotification(fullPurchase.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", claimed.id, fullPurchase.item_id);
             } else {
               await sb.from("activity_feed").insert({
                 event_type: "item_purchased",
                 actor_id: fullPurchase.developer_id,
                 metadata: { login: dev?.github_login, item_id: fullPurchase.item_id },
               });
-              sendPurchaseNotification(fullPurchase.developer_id, dev?.github_login ?? "", purchase.id, fullPurchase.item_id);
+              sendPurchaseNotification(fullPurchase.developer_id, dev?.github_login ?? "", claimed.id, fullPurchase.item_id);
             }
           }
         }

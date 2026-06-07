@@ -100,34 +100,31 @@ export async function POST(request: Request) {
           break;
         }
 
-        // Find the pending purchase by provider_tx_id
-        const { data: purchase } = await sb
+        // Atomic claim: transition pending → processing in one UPDATE.
+        // If another concurrent webhook already claimed it, data is null and we skip.
+        const { data: claimed } = await sb
           .from("purchases")
-          .select("id, status, developer_id, item_id, gifted_to")
+          .update({ status: "processing" })
           .eq("provider_tx_id", orderId)
           .eq("provider", "cashfree")
+          .eq("status", "pending")
+          .select("id, developer_id, item_id, gifted_to")
           .maybeSingle();
 
-        if (!purchase) {
-          console.warn(`[Cashfree webhook] No purchase found for order ${orderId}`);
+        if (!claimed) {
+          console.log(`[Cashfree webhook] Purchase for order ${orderId} already claimed or not found — skipping.`);
           break;
         }
 
-        if (purchase.status !== "pending") {
-          console.log(`[Cashfree webhook] Purchase ${purchase.id} already ${purchase.status}`);
-          break;
-        }
+        const ownerId = claimed.gifted_to ?? claimed.developer_id;
+        const { status: purchaseStatus } = await fulfillItemPurchase(ownerId, claimed.item_id, sb);
 
-        const ownerId = purchase.gifted_to ?? purchase.developer_id;
-        const { status: purchaseStatus } = await fulfillItemPurchase(ownerId, purchase.item_id, sb);
-
-        // Mark as completed/delivered
         await sb
           .from("purchases")
           .update({ status: purchaseStatus })
-          .eq("id", purchase.id);
+          .eq("id", claimed.id);
 
-        const fullPurchase = purchase;
+        const fullPurchase = claimed;
 
         if (fullPurchase) {
           // Auto-equip if it's the only item in its zone
@@ -164,14 +161,14 @@ export async function POST(request: Request) {
               fullPurchase.developer_id,
               dev?.github_login ?? "",
               receiver?.github_login ?? "unknown",
-              purchase.id,
+              claimed.id,
               fullPurchase.item_id,
             );
             sendGiftReceivedNotification(
               fullPurchase.gifted_to,
               dev?.github_login ?? "someone",
               receiver?.github_login ?? "unknown",
-              purchase.id,
+              claimed.id,
               fullPurchase.item_id,
             );
           } else {
@@ -188,7 +185,7 @@ export async function POST(request: Request) {
             sendPurchaseNotification(
               fullPurchase.developer_id,
               dev?.github_login ?? "",
-              purchase.id,
+              claimed.id,
               fullPurchase.item_id,
             );
           }
