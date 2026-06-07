@@ -30,16 +30,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_rating            INT;
-  v_problems_solved   INT;
-  v_problems_attempted INT;
-  v_current_streak    INT;
-  v_best_streak       INT;
-  v_last_solved_at    TIMESTAMPTZ;
-  v_today             TEXT;
-  v_yesterday         TEXT;
-  v_last_solved_date  TEXT;
-  v_now               TIMESTAMPTZ := now();
+  v_rating             INT         := 1200;
+  v_problems_solved    INT         := 0;
+  v_problems_attempted INT         := 0;
+  v_current_streak     INT         := 0;
+  v_best_streak        INT         := 0;
+  v_last_solved_at     TIMESTAMPTZ := NULL;
+  v_today              TEXT;
+  v_yesterday          TEXT;
+  v_last_solved_date   TEXT;
+  v_now                TIMESTAMPTZ := now();
 BEGIN
   v_today     := to_char(v_now AT TIME ZONE 'UTC', 'YYYY-MM-DD');
   v_yesterday := to_char((v_now - INTERVAL '1 day') AT TIME ZONE 'UTC', 'YYYY-MM-DD');
