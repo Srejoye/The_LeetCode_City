@@ -100,31 +100,49 @@ export async function POST(request: Request) {
           break;
         }
 
-        // Atomic claim: transition pending → processing in one UPDATE.
-        // If another concurrent webhook already claimed it, data is null and we skip.
-        const { data: claimed } = await sb
+        // Find the pending purchase by provider_tx_id
+        const { data: purchase } = await sb
           .from("purchases")
-          .update({ status: "processing" })
+          .select("id, status, developer_id, item_id, gifted_to")
           .eq("provider_tx_id", orderId)
           .eq("provider", "cashfree")
-          .eq("status", "pending")
-          .select("id, developer_id, item_id, gifted_to")
           .maybeSingle();
 
-        if (!claimed) {
-          console.log(`[Cashfree webhook] Purchase for order ${orderId} already claimed or not found — skipping.`);
+        if (!purchase) {
+          console.warn(`[Cashfree webhook] No purchase found for order ${orderId}`);
           break;
         }
 
-        const ownerId = claimed.gifted_to ?? claimed.developer_id;
-        const { status: purchaseStatus } = await fulfillItemPurchase(ownerId, claimed.item_id, sb);
+        if (purchase.status !== "pending") {
+          console.log(`[Cashfree webhook] Purchase ${purchase.id} already ${purchase.status} — skipping`);
+          break;
+        }
 
+        // Atomic claim: transition pending → processing in one UPDATE.
+        // If a concurrent request already claimed it, claimed will be null.
+        const { data: claimed } = await sb
+          .from("purchases")
+          .update({ status: "processing" })
+          .eq("id", purchase.id)
+          .eq("status", "pending")
+          .select("id")
+          .maybeSingle();
+
+        if (!claimed) {
+          console.log(`[Cashfree webhook] Purchase ${purchase.id} already claimed by concurrent request — skipping`);
+          break;
+        }
+
+        const ownerId = purchase.gifted_to ?? purchase.developer_id;
+        const { status: purchaseStatus } = await fulfillItemPurchase(ownerId, purchase.item_id, sb);
+
+        // Mark as completed/delivered
         await sb
           .from("purchases")
           .update({ status: purchaseStatus })
-          .eq("id", claimed.id);
+          .eq("id", purchase.id);
 
-        const fullPurchase = claimed;
+        const fullPurchase = purchase;
 
         if (fullPurchase) {
           // Auto-equip if it's the only item in its zone
@@ -161,14 +179,14 @@ export async function POST(request: Request) {
               fullPurchase.developer_id,
               dev?.github_login ?? "",
               receiver?.github_login ?? "unknown",
-              claimed.id,
+              purchase.id,
               fullPurchase.item_id,
             );
             sendGiftReceivedNotification(
               fullPurchase.gifted_to,
               dev?.github_login ?? "someone",
               receiver?.github_login ?? "unknown",
-              claimed.id,
+              purchase.id,
               fullPurchase.item_id,
             );
           } else {
@@ -185,7 +203,7 @@ export async function POST(request: Request) {
             sendPurchaseNotification(
               fullPurchase.developer_id,
               dev?.github_login ?? "",
-              claimed.id,
+              purchase.id,
               fullPurchase.item_id,
             );
           }

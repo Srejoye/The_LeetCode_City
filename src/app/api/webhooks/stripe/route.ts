@@ -184,14 +184,20 @@ export async function POST(request: Request) {
             sendPurchaseNotification(Number(developerId), githubLogin ?? "", claimedPending.id, itemId);
           }
         } else {
-          // 2. No pending record found; check if this transaction was already processed
+          // No pending row found. Check if already processing or completed —
+          // query by developer_id+item_id+provider, NOT provider_tx_id, because
+          // a concurrent winning request may not have written provider_tx_id yet.
           const { data: existing } = await sb
             .from("purchases")
-            .select("id, status")
-            .eq("provider_tx_id", txId)
+            .select("id")
+            .eq("developer_id", Number(developerId))
+            .eq("item_id", itemId)
+            .eq("provider", "stripe")
+            .in("status", ["processing", "completed", "delivered"])
             .maybeSingle();
 
           if (!existing) {
+            // Genuine edge case: pending row was cleaned up before webhook arrived
             const giftedTo = session.metadata?.gifted_to;
             const ownerId = giftedTo ? Number(giftedTo) : Number(developerId);
             
@@ -220,6 +226,7 @@ export async function POST(request: Request) {
               await autoEquipIfSolo(ownerId, itemId);
             }
           }
+          // else: already processing or completed — do nothing
         }
         break;
       }

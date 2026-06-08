@@ -80,64 +80,84 @@ export async function POST(request: Request) {
           break;
         }
 
-        // Atomic claim: prevents double-fulfillment on NOWPayments' frequent retries.
-        const { data: claimed } = await sb
+        // Find pending purchase by provider_tx_id (invoice ID stored at checkout)
+        const { data: purchase } = await sb
           .from("purchases")
-          .update({ status: "processing" })
+          .select("id, status, developer_id, item_id, gifted_to")
           .eq("provider", "nowpayments")
           .eq("status", "pending")
           .eq("provider_tx_id", orderId)
-          .select("id, developer_id, item_id, gifted_to")
           .maybeSingle();
 
-        if (!claimed) break; // already claimed or not found
+        if (!purchase) {
+          // Could be a concurrent request already claimed it (status is now "processing")
+          // or genuinely not found. Either way, do not fulfill.
+          console.log(`[NOWPayments webhook] No pending purchase for order ${orderId} — skipping`);
+          break;
+        }
 
-        const ownerId = claimed.gifted_to ?? claimed.developer_id;
-        const { status: purchaseStatus } = await fulfillItemPurchase(ownerId, claimed.item_id, sb);
+        // Atomic claim: transition pending → processing in one UPDATE.
+        // If a concurrent request already claimed it, claimed will be null.
+        const { data: claimed } = await sb
+          .from("purchases")
+          .update({ status: "processing" })
+          .eq("id", purchase.id)
+          .eq("status", "pending")
+          .select("id")
+          .maybeSingle();
 
+        if (!claimed) {
+          console.log(`[NOWPayments webhook] Purchase ${purchase.id} already claimed by concurrent request — skipping`);
+          break;
+        }
+
+        const ownerId = purchase.gifted_to ?? purchase.developer_id;
+        const { status: purchaseStatus } = await fulfillItemPurchase(ownerId, purchase.item_id, sb);
+
+        // Update payment ID and mark status (completed or delivered)
         await sb
           .from("purchases")
           .update({
             status: purchaseStatus,
             provider_tx_id: paymentId ?? orderId,
           })
-          .eq("id", claimed.id);
+          .eq("id", purchase.id);
 
         // Auto-equip if solo item in zone
-        await autoEquipIfSolo(ownerId, claimed.item_id);
+        await autoEquipIfSolo(ownerId, purchase.item_id);
 
         // Insert feed event
         const { data: dev } = await sb
           .from("developers")
           .select("github_login")
-          .eq("id", claimed.developer_id)
+          .eq("id", purchase.developer_id)
           .single();
 
-        if (claimed.gifted_to) {
+        if (purchase.gifted_to) {
           const { data: receiver } = await sb
             .from("developers")
             .select("github_login")
-            .eq("id", claimed.gifted_to)
+            .eq("id", purchase.gifted_to)
             .single();
           await sb.from("activity_feed").insert({
             event_type: "gift_sent",
-            actor_id: claimed.developer_id,
-            target_id: claimed.gifted_to,
+            actor_id: purchase.developer_id,
+            target_id: purchase.gifted_to,
             metadata: {
               giver_login: dev?.github_login,
               receiver_login: receiver?.github_login ?? "unknown",
-              item_id: claimed.item_id,
+              item_id: purchase.item_id,
             },
           });
-          sendGiftSentNotification(claimed.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", claimed.id, claimed.item_id);
-          sendGiftReceivedNotification(claimed.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", claimed.id, claimed.item_id);
+          sendGiftSentNotification(purchase.developer_id, dev?.github_login ?? "", receiver?.github_login ?? "unknown", purchase.id, purchase.item_id);
+          sendGiftReceivedNotification(purchase.gifted_to, dev?.github_login ?? "someone", receiver?.github_login ?? "unknown", purchase.id, purchase.item_id);
         } else {
           await sb.from("activity_feed").insert({
             event_type: "item_purchased",
-            actor_id: claimed.developer_id,
-            metadata: { login: dev?.github_login, item_id: claimed.item_id },
+            actor_id: purchase.developer_id,
+            metadata: { login: dev?.github_login, item_id: purchase.item_id },
           });
-          sendPurchaseNotification(claimed.developer_id, dev?.github_login ?? "", claimed.id, claimed.item_id);
+          sendPurchaseNotification(purchase.developer_id, dev?.github_login ?? "", purchase.id, purchase.item_id);
         }
         break;
       }
